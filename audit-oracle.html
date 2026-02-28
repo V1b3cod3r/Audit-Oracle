@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Oracle</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #f5f0e8;
+  --dark: #1a1410;
+  --red: #c0392b;
+  --gold: #d4a017;
+  --green: #2d6a2d;
+  --blue: #1a4a7a;
+  --text: #1a1410;
+  --muted: #7a7060;
+  --card: #fffdf7;
+  --border: #d0c8b0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 2rem 1rem 4rem;
+}
+
+/* Noise texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1000;
+  opacity: 0.6;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.logo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(3rem, 8vw, 5rem);
+  letter-spacing: 0.15em;
+  line-height: 0.9;
+  color: var(--dark);
+}
+.logo span { color: var(--red); }
+
+.tagline {
+  font-size: 0.6rem;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-top: 0.5rem;
+}
+
+/* Input section */
+.input-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 1.8rem 2rem;
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 1.5rem;
+  box-shadow: 4px 4px 0 var(--border);
+}
+
+.input-section h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 0.6rem;
+  color: var(--muted);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.field-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex: 1;
+}
+
+input[type="number"] {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.4rem;
+  font-weight: 400;
+  width: 90px;
+  text-align: center;
+  border: none;
+  border-bottom: 2px solid var(--dark);
+  background: transparent;
+  color: var(--dark);
+  padding: 0.2rem 0.4rem;
+  outline: none;
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+input[type="number"]:focus { border-color: var(--red); }
+
+.spin-btn {
+  display: block;
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 0.9rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.3rem;
+  letter-spacing: 0.3em;
+  background: var(--dark);
+  color: var(--bg);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.spin-btn:hover { background: var(--red); }
+.spin-btn:active { transform: translate(2px, 2px); box-shadow: none; }
+
+/* Games section */
+.game-stage {
+  display: none;
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 1.5rem;
+  animation: fadeIn 0.4s ease;
+}
+.game-stage.show { display: block; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.game-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 2rem 1.5rem;
+  text-align: center;
+  box-shadow: 4px 4px 0 var(--border);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.game-label {
+  font-size: 0.6rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* SLOT MACHINE */
+.slot-machine {
+  display: flex;
+  gap: 8px;
+  margin: 0.5rem 0;
+}
+
+.reel {
+  width: 64px;
+  height: 76px;
+  border: 3px solid var(--dark);
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  box-shadow: inset 0 0 8px rgba(0,0,0,0.15);
+}
+
+.reel-inner {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0s;
+}
+
+.reel-item {
+  width: 64px;
+  height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  line-height: 1;
+}
+
+.slot-result {
+  font-size: 0.65rem;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  min-height: 18px;
+}
+
+/* DART BOARD */
+.dartboard-wrap { position: relative; margin: 0.5rem 0; }
+canvas#dartboard { display: block; }
+.dart-marker {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--red);
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--dark);
+  display: none;
+  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+/* MAGIC 8 BALL */
+.ball {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #2a2a2a, #000 70%);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5), inset 0 3px 6px rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.5rem auto;
+  position: relative;
+}
+.ball::before {
+  content: '';
+  position: absolute;
+  top: 14%;
+  left: 20%;
+  width: 28%;
+  height: 18%;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.1) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.ball-window {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #1a2a4a, #050a15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(100,150,200,0.2);
+}
+.ball-text {
+  font-size: 0.62rem;
+  font-style: italic;
+  color: rgba(180,210,255,0.9);
+  text-align: center;
+  line-height: 1.3;
+  padding: 6px;
+}
+
+/* VERDICT PANEL */
+.verdict-panel {
+  background: var(--dark);
+  color: var(--bg);
+  width: 100%;
+  max-width: 500px;
+  padding: 2rem;
+  display: none;
+  animation: slideUp 0.4s ease;
+  box-shadow: 6px 6px 0 #8a8070;
+}
+
+.verdict-panel.show { display: block; }
+
+.disclaimer {
+  margin-top: 1rem;
+  font-size: 0.62rem;
+  line-height: 1.6;
+  letter-spacing: 0.05em;
+  color: var(--red);
+  background: #fff5f5;
+  border: 1px solid #f0c0c0;
+  padding: 0.7rem 1.2rem;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.disclaimer em { font-style: italic; font-weight: bold; }
+
+.input-note {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: 1.2rem;
+  border-left: 2px solid var(--border);
+  padding-left: 0.7rem;
+}
+
+.verdict-eyebrow {
+  font-size: 0.58rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 1rem;
+}
+
+.verdict-footer {
+  margin-top: 1.2rem;
+  font-size: 0.58rem;
+  font-style: italic;
+  color: #444;
+  letter-spacing: 0.05em;
+  border-top: 1px solid #333;
+  padding-top: 1rem;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.verdict-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.verdict-rating {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  letter-spacing: 0.1em;
+  line-height: 1;
+}
+
+.rating-satisfactory { color: #6aff6a; }
+.rating-needs { color: var(--gold); }
+.rating-unsatisfactory { color: #ff8844; }
+.rating-adverse { color: var(--red); }
+
+.verdict-method {
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #666;
+  margin-top: 0.3rem;
+}
+
+.verdict-msg {
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #ccc;
+  border-left: 3px solid var(--red);
+  padding-left: 1rem;
+  line-height: 1.6;
+}
+
+.verdict-stats {
+  margin-top: 1.5rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.15em;
+  color: #555;
+  display: flex;
+  gap: 2rem;
+}
+
+.reset-link {
+  margin-top: 2rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: inherit;
+}
+.reset-link:hover { color: var(--red); }
+
+/* Animations */
+@keyframes spinReel {
+  from { transform: translateY(0); }
+  to { transform: translateY(-9999px); }
+}
+
+.spinning .reel-inner {
+  animation: reelSpin 0.08s linear infinite;
+}
+
+@keyframes reelSpin {
+  from { transform: translateY(0); }
+  to { transform: translateY(-220px); }
+}
+
+.ball.shake {
+  animation: ballShake 0.5s ease;
+}
+@keyframes ballShake {
+  0%,100% { transform: rotate(0); }
+  20% { transform: rotate(-10deg); }
+  40% { transform: rotate(10deg); }
+  60% { transform: rotate(-6deg); }
+  80% { transform: rotate(6deg); }
+}
+
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">AUDIT<span>·</span>ORACLE</div>
+  <div class="tagline">The industry-standard audit rating engine</div>
+
+</header>
+
+<div class="input-section">
+  <h2>// Step 1: Enter Your Irrelevant Data</h2>
+  <div class="input-note">This information will be collected, analyzed, and then completely ignored.</div>
+  <div class="field-row">
+    <span class="field-label">Controls Examined</span>
+    <input type="number" id="controls" min="0" value="0" />
+  </div>
+  <div class="field-row">
+    <span class="field-label">Open Issues</span>
+    <input type="number" id="issues" min="0" value="0" />
+  </div>
+  <button class="spin-btn" onclick="runOracle()">⚡ LET CHANCE DECIDE</button>
+</div>
+
+<!-- Game Stage: one game shown at a time -->
+<div class="game-stage" id="gameStage">
+
+  <!-- Slot Machine -->
+  <div class="game-card" id="slotCard" style="display:none">
+    <div class="game-label">🎰 Slot Machine</div>
+    <div class="slot-machine">
+      <div class="reel" id="reel1"><div class="reel-inner" id="ri1"></div></div>
+      <div class="reel" id="reel2"><div class="reel-inner" id="ri2"></div></div>
+      <div class="reel" id="reel3"><div class="reel-inner" id="ri3"></div></div>
+    </div>
+    <div class="slot-result" id="slotResult">—</div>
+  </div>
+
+  <!-- Dart Board -->
+  <div class="game-card" id="dartCard" style="display:none">
+    <div class="game-label">🎯 Dart Board</div>
+    <div class="dartboard-wrap">
+      <canvas id="dartboard" width="180" height="180"></canvas>
+      <div class="dart-marker" id="dartMarker"></div>
+    </div>
+    <div class="slot-result" id="dartResult">—</div>
+  </div>
+
+  <!-- Magic 8 Ball -->
+  <div class="game-card" id="ballCard" style="display:none">
+    <div class="game-label">🎱 Magic 8 Ball</div>
+    <div class="ball" id="ball8">
+      <div class="ball-window">
+        <div class="ball-text" id="ballText">?</div>
+      </div>
+    </div>
+    <div class="slot-result" id="ballResult">—</div>
+  </div>
+
+</div>
+
+<!-- Verdict -->
+<div class="verdict-panel" id="verdictPanel">
+  <div class="verdict-eyebrow">🎲 OFFICIAL AUDIT RATING — DETERMINED BY CHANCE</div>
+  <div class="verdict-top">
+    <div>
+      <div class="verdict-rating" id="verdictRating">—</div>
+      <div class="verdict-method" id="verdictMethod">determined by: —</div>
+    </div>
+  </div>
+  <div class="verdict-msg" id="verdictMsg">—</div>
+  <div class="verdict-stats" id="verdictStats"></div>
+  <div class="verdict-footer">Your data had no bearing on this result. Neither would anyone else's.</div>
+  <button class="reset-link" onclick="resetAll()">← Spin again (result will differ for no reason)</button>
+</div>
+
+<script>
+// ─── Data ───────────────────────────────────────────────────────────────────
+
+const RATINGS = ['Satisfactory', 'Needs Improvement', 'Unsatisfactory', 'Adverse'];
+
+const MESSAGES = {
+  'Satisfactory': [
+    "Congratulations. The slot machine likes you today. Don't read into it.",
+    "A clean rating, achieved through pure statistical luck. Frame it anyway.",
+    "The auditors are satisfied. This has nothing to do with your controls.",
+    "You passed. The game was feeling generous. Results not reproducible.",
+  ],
+  'Needs Improvement': [
+    "The game has spoken. Please remediate before it spins again.",
+    "A random process has identified opportunities. Isn't that something.",
+    "Needs Improvement — selected at random from four equally arbitrary options.",
+    "The controls may be fine. The dart doesn't care either way.",
+  ],
+  'Unsatisfactory': [
+    "Bad luck. The 8-ball was not in your favor. File the report anyway.",
+    "The game determined this. Your 47 controls were not consulted.",
+    "Unsatisfactory — because that's where the dart landed. Management must act.",
+    "A random number generator has found your audit wanting. Escalate accordingly.",
+  ],
+  'Adverse': [
+    "The worst rating, delivered by a game of chance. The board will understand.",
+    "Adverse. The slot machine has spoken. The regulators are on their way.",
+    "Your fate was sealed the moment the oracle was consulted. Sorry.",
+    "Pure random selection has concluded your audit is a disaster. Good luck.",
+  ]
+};
+
+const SLOT_SYMBOLS = {
+  'Satisfactory':    ['✅','✅','✅'],
+  'Needs Improvement':['⚠️','⚠️','🔔'],
+  'Unsatisfactory':  ['❌','❌','🎲'],
+  'Adverse':         ['💀','💀','💀'],
+};
+
+const BALL_PHRASES = {
+  'Satisfactory':    ['It is certain','All is well','Carry on','Signs point yes'],
+  'Needs Improvement':['Reply hazy','Outlook cloudy','Ask again later','Proceed with caution'],
+  'Unsatisfactory':  ['Don\'t count on it','Very doubtful','My sources say no','Outlook not good'],
+  'Adverse':         ['Outlook grim','Very doubtful','All is lost','Do not count on it'],
+};
+
+// ─── Oracle Logic ────────────────────────────────────────────────────────────
+
+function randomRating() {
+  return RATINGS[Math.floor(Math.random() * RATINGS.length)];
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ─── Slot Machine ────────────────────────────────────────────────────────────
+
+const ALL_SYMBOLS = ['✅','⚠️','❌','💀','🔔','🎲','🃏','🎯','🎰'];
+
+function buildReel(id, finalSymbol, stopDelay) {
+  const inner = document.getElementById(id);
+  // Fill with lots of random symbols + final on top
+  let html = '';
+  for (let i = 0; i < 30; i++) html += `<div class="reel-item">${ALL_SYMBOLS[Math.floor(Math.random()*ALL_SYMBOLS.length)]}</div>`;
+  html += `<div class="reel-item">${finalSymbol}</div>`;
+  inner.innerHTML = html;
+  inner.style.transform = 'translateY(0)';
+}
+
+function spinSlot(rating) {
+  const symbols = SLOT_SYMBOLS[rating];
+  ['ri1','ri2','ri3'].forEach((id,i) => buildReel(id, symbols[i], 0));
+
+  const reels = ['ri1','ri2','ri3'];
+  document.getElementById('slotResult').textContent = '...';
+
+  reels.forEach((id, i) => {
+    const inner = document.getElementById(id);
+    const items = inner.querySelectorAll('.reel-item');
+    const totalItems = items.length;
+    const itemH = 76;
+    const targetPos = -(totalItems - 1) * itemH; // land on last item (final symbol)
+
+    // Animate: rapid scroll then settle
+    let start = null;
+    const duration = 800 + i * 400;
+
+    function animate(ts) {
+      if (!start) start = ts;
+      const elapsed = ts - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out
+      const eased = 1 - Math.pow(1 - progress, 3);
+      // Spin a few full loops then land
+      const loops = 3 + i;
+      const totalTravel = loops * totalItems * itemH + Math.abs(targetPos);
+      const pos = -eased * totalTravel;
+      // Wrap for visual spinning
+      const wrapped = pos % (totalItems * itemH);
+      inner.style.transform = `translateY(${wrapped}px)`;
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      } else {
+        inner.style.transform = `translateY(${-(totalItems-1)*itemH}px)`;
+        if (i === 2) document.getElementById('slotResult').textContent = rating;
+      }
+    }
+    requestAnimationFrame(animate);
+  });
+}
+
+// ─── Dart Board ──────────────────────────────────────────────────────────────
+
+function drawDartboard() {
+  const canvas = document.getElementById('dartboard');
+  const ctx = canvas.getContext('2d');
+  const cx = 90, cy = 90, r = 84;
+  ctx.clearRect(0, 0, 180, 180);
+
+  const rings = [
+    { r: r*0.08, color: '#e74c3c' },
+    { r: r*0.20, color: '#2ecc71' },
+    { r: r*0.35, color: '#f5f0e8' },
+    { r: r*0.52, color: '#1a1410' },
+    { r: r*0.65, color: '#f5f0e8' },
+    { r: r*0.80, color: '#1a1410' },
+    { r: r*0.92, color: '#f5f0e8' },
+    { r: r,      color: '#1a1410' },
+  ];
+
+  const segments = 20;
+  for (let s = 0; s < segments; s++) {
+    const angle1 = (s / segments) * Math.PI * 2 - Math.PI/2;
+    const angle2 = ((s+1) / segments) * Math.PI * 2 - Math.PI/2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, angle1, angle2);
+    ctx.fillStyle = s % 2 === 0 ? '#1a1410' : '#f5f0e8';
+    ctx.fill();
+  }
+
+  for (let i = rings.length-1; i >= 0; i--) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, rings[i].r, 0, Math.PI*2);
+    ctx.fillStyle = rings[i].color;
+    ctx.fill();
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI*2);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+}
+
+function throwDart(rating) {
+  const marker = document.getElementById('dartMarker');
+
+  const zones = {
+    'Satisfactory':     [0, 0.22],
+    'Needs Improvement':[0.22, 0.52],
+    'Unsatisfactory':   [0.52, 0.78],
+    'Adverse':          [0.78, 1.0],
+  };
+
+  const [minR, maxR] = zones[rating];
+  const cx = 90, cy = 90, r = 84;
+  const dist = (minR + Math.random() * (maxR - minR)) * r;
+  const angle = Math.random() * Math.PI * 2;
+  const dartX = cx + dist * Math.cos(angle);
+  const dartY = cy + dist * Math.sin(angle);
+
+  marker.style.left = dartX + 'px';
+  marker.style.top = dartY + 'px';
+  marker.style.display = 'none';
+  marker.style.opacity = '0';
+  setTimeout(() => {
+    marker.style.display = 'block';
+    marker.style.transition = 'opacity 0.2s';
+    marker.style.opacity = '1';
+  }, 700);
+
+  document.getElementById('dartResult').textContent = rating;
+}
+
+// ─── Magic 8 Ball ────────────────────────────────────────────────────────────
+
+function shake8ball(rating) {
+  const ball = document.getElementById('ball8');
+  const text = document.getElementById('ballText');
+  text.textContent = '...';
+  ball.classList.add('shake');
+  setTimeout(() => {
+    ball.classList.remove('shake');
+    text.textContent = pick(BALL_PHRASES[rating]);
+    document.getElementById('ballResult').textContent = rating;
+  }, 600);
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+function runOracle() {
+  const controls = parseInt(document.getElementById('controls').value) || 0;
+  const issues = parseInt(document.getElementById('issues').value) || 0;
+
+  const rating = randomRating();
+
+  // Randomly pick ONE game
+  const games = ['slot', 'dart', 'ball'];
+  const chosenGame = games[Math.floor(Math.random() * games.length)];
+  const methodNames = { slot: 'Slot Machine', dart: 'Dart Board', ball: 'Magic 8-Ball' };
+
+  // Hide all game cards, show the stage
+  ['slotCard','dartCard','ballCard'].forEach(id => document.getElementById(id).style.display = 'none');
+  const stage = document.getElementById('gameStage');
+  stage.classList.remove('show');
+  void stage.offsetWidth; // force reflow for animation restart
+  stage.classList.add('show');
+
+  // Show and run chosen game
+  if (chosenGame === 'slot') {
+    document.getElementById('slotCard').style.display = 'flex';
+    spinSlot(rating);
+  } else if (chosenGame === 'dart') {
+    document.getElementById('dartCard').style.display = 'flex';
+    drawDartboard();
+    throwDart(rating);
+  } else {
+    document.getElementById('ballCard').style.display = 'flex';
+    shake8ball(rating);
+  }
+
+  // Show verdict after animation
+  setTimeout(() => {
+    const panel = document.getElementById('verdictPanel');
+    panel.classList.remove('show');
+    void panel.offsetWidth;
+    panel.classList.add('show');
+
+    const rv = document.getElementById('verdictRating');
+    rv.textContent = rating.toUpperCase();
+    rv.className = 'verdict-rating';
+    if (rating === 'Satisfactory') rv.classList.add('rating-satisfactory');
+    else if (rating === 'Needs Improvement') rv.classList.add('rating-needs');
+    else if (rating === 'Unsatisfactory') rv.classList.add('rating-unsatisfactory');
+    else rv.classList.add('rating-adverse');
+
+    document.getElementById('verdictMethod').textContent = `determined by: ${methodNames[chosenGame]}`;
+    document.getElementById('verdictMsg').textContent = pick(MESSAGES[rating]);
+    document.getElementById('verdictStats').innerHTML =
+      `<span>${controls} controls (ignored)</span><span>${issues} issues (irrelevant)</span><span>method: ${methodNames[chosenGame]}</span>`;
+
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 1600);
+}
+
+function resetAll() {
+  document.getElementById('gameStage').classList.remove('show');
+  document.getElementById('verdictPanel').classList.remove('show');
+  document.getElementById('dartMarker').style.display = 'none';
+  document.getElementById('slotResult').textContent = '—';
+  document.getElementById('dartResult').textContent = '—';
+  document.getElementById('ballResult').textContent = '—';
+  document.getElementById('ballText').textContent = '?';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Enter key support
+document.addEventListener('keydown', e => { if (e.key === 'Enter') runOracle(); });
+</script>
+</body>
+</html>
