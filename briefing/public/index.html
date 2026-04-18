@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Morning Briefing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="noise"></div>
+
+  <header class="masthead">
+    <div class="masthead-row">
+      <div class="slug">No. 001 / Morning Edition</div>
+      <div class="slug" id="today-date"></div>
+    </div>
+    <h1 class="title">The Morning Briefing</h1>
+    <div class="masthead-row">
+      <div class="slug">Curated · WSJ · FT · Economist</div>
+      <div class="slug">Signal over Noise</div>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="today">Today</button>
+    <button class="tab" data-tab="saved">Saved</button>
+    <div class="nav-spacer"></div>
+    <button id="refresh-btn" class="action-btn">Refresh Briefing</button>
+  </nav>
+
+  <section class="stats" id="stats"></section>
+
+  <main id="content"></main>
+
+  <footer class="colophon">
+    <span>Built with Claude · <span id="generated-at"></span></span>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
