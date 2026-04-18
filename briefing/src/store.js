@@ -3,49 +3,73 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = resolve(HERE, '..', 'data');
-const BRIEFING_FILE = resolve(DATA_DIR, 'briefing.json');
-const SAVED_FILE = resolve(DATA_DIR, 'saved.json');
+const LOCAL_DIR = resolve(HERE, '..', 'data');
+const LOCAL_FILE = resolve(LOCAL_DIR, 'briefing.json');
+const BRIEFING_KEY = 'briefing:current';
+const RUNNING_KEY = 'briefing:running';
 
-async function readJson(path, fallback) {
+function redisEnv() {
+  const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+  return url && token ? { url, token } : null;
+}
+
+let redisClient = null;
+let redisChecked = false;
+
+async function getRedis() {
+  if (redisChecked) return redisClient;
+  redisChecked = true;
+  const env = redisEnv();
+  if (!env) return null;
   try {
-    const raw = await readFile(path, 'utf8');
+    const { Redis } = await import('@upstash/redis');
+    redisClient = new Redis(env);
+    return redisClient;
+  } catch (err) {
+    console.warn('[store] @upstash/redis unavailable, using filesystem:', err.message);
+    return null;
+  }
+}
+
+export async function getBriefing() {
+  const redis = await getRedis();
+  if (redis) {
+    const value = await redis.get(BRIEFING_KEY);
+    return value || null;
+  }
+  try {
+    const raw = await readFile(LOCAL_FILE, 'utf8');
     return JSON.parse(raw);
   } catch (err) {
-    if (err.code === 'ENOENT') return fallback;
+    if (err.code === 'ENOENT') return null;
     throw err;
   }
 }
 
-async function writeJson(path, data) {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, JSON.stringify(data, null, 2));
-}
-
-export async function getBriefing() {
-  return readJson(BRIEFING_FILE, null);
-}
-
 export async function saveBriefing(briefing) {
-  await writeJson(BRIEFING_FILE, briefing);
+  const redis = await getRedis();
+  if (redis) {
+    await redis.set(BRIEFING_KEY, briefing);
+    return briefing;
+  }
+  await mkdir(LOCAL_DIR, { recursive: true });
+  await writeFile(LOCAL_FILE, JSON.stringify(briefing, null, 2));
   return briefing;
 }
 
-export async function getSaved() {
-  return readJson(SAVED_FILE, []);
+export async function setRunning(running) {
+  const redis = await getRedis();
+  if (!redis) return;
+  if (running) {
+    await redis.set(RUNNING_KEY, { since: Date.now() }, { ex: 600 });
+  } else {
+    await redis.del(RUNNING_KEY);
+  }
 }
 
-export async function saveArticle(article) {
-  const saved = await getSaved();
-  if (saved.some((a) => a.url === article.url)) return saved;
-  const next = [{ ...article, savedAt: new Date().toISOString() }, ...saved];
-  await writeJson(SAVED_FILE, next);
-  return next;
-}
-
-export async function unsaveArticle(url) {
-  const saved = await getSaved();
-  const next = saved.filter((a) => a.url !== url);
-  await writeJson(SAVED_FILE, next);
-  return next;
+export async function isRunning() {
+  const redis = await getRedis();
+  if (!redis) return false;
+  return !!(await redis.get(RUNNING_KEY));
 }

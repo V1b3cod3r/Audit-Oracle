@@ -1,12 +1,9 @@
 import { fetchAllFeeds } from './feeds.js';
 import { curateArticles } from './claude.js';
-import { saveBriefing } from './store.js';
-
-let running = false;
+import { saveBriefing, setRunning } from './store.js';
 
 export async function generateBriefing() {
-  if (running) throw new Error('Briefing generation already in progress');
-  running = true;
+  await setRunning(true);
   const startedAt = new Date().toISOString();
   try {
     console.log(`[briefing] fetching feeds at ${startedAt}`);
@@ -28,10 +25,6 @@ export async function generateBriefing() {
     console.log(`[briefing] done: ${curated.length} articles, ${keyStories} key stories`);
     return briefing;
   } finally {
-    running = false;
+    await setRunning(false);
   }
-}
-
-export function isRunning() {
-  return running;
 }

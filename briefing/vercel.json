@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/briefing/refresh",
+      "schedule": "0 10 * * *"
+    }
+  ],
+  "functions": {
+    "api/briefing/refresh.js": {
+      "maxDuration": 300
+    },
+    "api/briefing.js": {
+      "maxDuration": 10
+    }
+  }
+}
