@@ -4,7 +4,7 @@
   "description": "Curated morning briefing from WSJ, FT, and The Economist",
   "type": "module",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "node dev.js",
     "brief": "node src/cli.js",
     "build": "echo no-op"
   },
@@ -13,8 +13,5 @@
     "@upstash/redis": "^1.34.3",
     "dotenv": "^16.4.5",
     "rss-parser": "^3.13.0"
-  },
-  "devDependencies": {
-    "vercel": "^37.0.0"
   }
 }

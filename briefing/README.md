@@ -20,15 +20,21 @@ Curated daily briefing from WSJ, FT, and The Economist. Claude ranks articles ag
 4. Deploy. The cron runs daily at 10:00 UTC (≈ 6 AM ET) and writes the briefing to KV. The UI reads from KV.
 5. You can trigger a manual refresh from the UI at any time (requires the Vercel Pro plan for functions >60s).
 
-## Local development
+## Run locally
+
+Requires Node 20+.
 
 ```bash
-cp .env.example .env   # paste ANTHROPIC_API_KEY; KV vars optional locally
+git clone <this-repo>
+cd Audit-Oracle/briefing
+cp .env.example .env    # edit it: paste your ANTHROPIC_API_KEY
 npm install
-npm run dev            # vercel dev — emulates the Vercel runtime
+npm run dev             # http://localhost:3000
 ```
 
-Without KV vars, it falls back to `data/briefing.json` on the local filesystem.
+Open `http://localhost:3000` in your browser and tap **Refresh**. First run takes ~30-60s to fetch feeds and score everything. Briefings cache to `data/briefing.json`; saved articles live in your browser's localStorage.
+
+KV/Upstash vars are optional locally — leave them blank and it falls back to the filesystem.
 
 ## One-shot CLI
 
