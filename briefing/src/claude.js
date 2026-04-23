@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 const client = new Anthropic();
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
 
-const INTERESTS = [
+const DEFAULT_INTERESTS = [
   'AI policy & regulation',
   'Federal Reserve & monetary policy',
   'Prediction markets & trading',
@@ -11,16 +11,36 @@ const INTERESTS = [
   'Market volatility & financial markets',
 ];
 
+function parseInterests() {
+  const raw = (process.env.BRIEFING_INTERESTS || '').trim();
+  if (!raw) return DEFAULT_INTERESTS;
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+const SUMMARY_PROFILES = {
+  short:  { instr: '2-3 tight sentences.',   desc: '2-3 sentence summary.',   tokens: 1024 },
+  medium: { instr: '4-5 sentences, one short paragraph.', desc: '4-5 sentence summary covering what happened, the key numbers, and context.', tokens: 1600 },
+  long:   { instr: '6-8 sentences, 2 short paragraphs.',  desc: '6-8 sentence summary: what happened, the key numbers, the context, and who is affected.', tokens: 2400 },
+};
+
+function summaryProfile() {
+  const key = (process.env.SUMMARY_LENGTH || 'short').toLowerCase();
+  return SUMMARY_PROFILES[key] || SUMMARY_PROFILES.short;
+}
+
+const INTERESTS = parseInterests();
+const PROFILE = summaryProfile();
+
 const SYSTEM_PROMPT = `You are a sharp morning-briefing editor. Your reader is a finance- and tech-literate professional who wants signal, not noise.
 
 Their interests, in priority order:
 ${INTERESTS.map((i, idx) => `${idx + 1}. ${i}`).join('\n')}
 
 For each article you score:
-- Summary: 2-3 tight sentences. State the news, not the framing. No throat-clearing.
+- Summary: ${PROFILE.instr} State the news, not the framing. No throat-clearing.
 - Key insight: one sentence on why it matters — the second-order implication, not a restatement.
 - Read time: whole minutes, based on ~225 wpm of the full article (estimate from excerpt length and topic depth).
-- Relevance: 1 (skip) to 5 (must-read). Score against the interests above. Generic macro headlines without a clear tie-in are 2 at best.
+- Relevance: 1 (skip) to 5 (must-read). Score against the interests above — articles matching the top interests should score 4 or 5. Generic macro headlines without a clear tie-in are 2 at best.
 
 Tone: direct, professional, readable. No hype. No "in a world where". No "this could mean".`;
 
@@ -32,7 +52,7 @@ const CLASSIFY_TOOL = {
     properties: {
       summary: {
         type: 'string',
-        description: '2-3 sentence summary of the article. Direct, no fluff.',
+        description: PROFILE.desc,
       },
       key_insight: {
         type: 'string',
@@ -71,7 +91,7 @@ ${article.excerpt || '(no excerpt available)'}`;
 
   const response = await client.messages.create({
     model: MODEL,
-    max_tokens: 1024,
+    max_tokens: PROFILE.tokens,
     system: [
       {
         type: 'text',
