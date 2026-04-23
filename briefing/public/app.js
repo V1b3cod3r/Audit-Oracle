@@ -116,6 +116,8 @@ function renderStats() {
   const b = state.briefing;
   if (!b) { el.innerHTML = ''; return; }
   const readTime = b.articles.reduce((s, a) => s + (a.read_time_minutes || 0), 0);
+  const cost = b.stats?.estimatedCost;
+  const costLabel = cost != null ? `$${cost.toFixed(3)}` : '—';
   el.innerHTML = `
     <div class="stat">
       <div class="stat-label">Articles</div>
@@ -128,6 +130,10 @@ function renderStats() {
     <div class="stat">
       <div class="stat-label">Read Time</div>
       <div class="stat-value">${readTime}<span class="unit">min</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Run Cost</div>
+      <div class="stat-value">${costLabel}</div>
     </div>
   `;
 }

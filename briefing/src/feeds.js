@@ -47,7 +47,7 @@ function extractExcerpt(item) {
     item.description,
   ].filter(Boolean);
   if (candidates.length === 0) return '';
-  return stripHtml(candidates[0]).slice(0, 2000);
+  return stripHtml(candidates[0]).slice(0, 1200);
 }
 
 function normalize(item, feed) {
