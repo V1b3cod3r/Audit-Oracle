@@ -6,37 +6,34 @@ const state = {
   tab: 'today',
   refreshing: false,
   settings: { interests: [], summaryLength: 'short' },
-  settingsDraft: null,
 };
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
 function loadSaved() {
-  try {
-    const raw = localStorage.getItem(SAVED_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+  try { return JSON.parse(localStorage.getItem(SAVED_KEY)) || []; } catch { return []; }
 }
-
 function persistSaved() {
   try { localStorage.setItem(SAVED_KEY, JSON.stringify(state.saved)); } catch {}
 }
-
 function savedSet() {
   return new Set(state.saved.map((a) => a.url));
 }
 
+function escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+const escapeAttr = escapeHtml;
+
 function formatDate(iso) {
   if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 }
-
 function formatTime(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
-
 function relativeTime(iso) {
   if (!iso) return '';
   const diff = Date.now() - Date.parse(iso);
@@ -47,36 +44,33 @@ function relativeTime(iso) {
   return `${Math.round(h / 24)}d ago`;
 }
 
-const BOOKMARK_OUTLINE = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>`;
-const BOOKMARK_FILLED = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>`;
+const BOOKMARK_OUTLINE = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>`;
+const BOOKMARK_FILLED = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>`;
 
-function articleCard(article, savedUrls) {
+function articleCard(article, savedUrls, { hero = false } = {}) {
   const isSaved = savedUrls.has(article.url);
-  const rel = article.relevance || 3;
-  const isKey = rel >= 4;
-  const tags = (article.tags || []).slice(0, 3).map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join('');
+  const tags = (article.tags || []).slice(0, 3).map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join('');
   return `
-    <article class="article ${isKey ? 'key' : ''}" data-url="${escapeAttr(article.url)}">
-      <div class="article-meta">
-        <span class="source-chip">${escapeHtml(article.source)}</span>
-        <span class="meta-dot"></span>
+    <article class="card ${hero ? 'hero-card' : ''}" data-url="${escapeAttr(article.url)}">
+      <div class="card-meta">
+        <span class="source">${escapeHtml(article.source)}</span>
+        <span class="meta-sep">·</span>
         <span>${escapeHtml(article.section)}</span>
-        <span class="meta-dot"></span>
+        <span class="meta-sep">·</span>
         <span>${relativeTime(article.publishedAt)}</span>
-        <span class="relevance-pill">${rel}/5</span>
       </div>
-      <h2 class="article-title">
+      <h2 class="card-title">
         <a href="${escapeAttr(article.url)}" target="_blank" rel="noopener">${escapeHtml(article.title)}</a>
       </h2>
-      <p class="article-summary">${escapeHtml(article.summary || article.excerpt || '')}</p>
+      <p class="card-summary">${escapeHtml(article.summary || article.excerpt || '')}</p>
       ${article.key_insight ? `
-        <div class="article-insight">
-          <span class="article-insight-label">Why it matters</span>
-          ${escapeHtml(article.key_insight)}
+        <div class="insight">
+          <span class="insight-label">Why it matters</span>
+          <div class="insight-body">${escapeHtml(article.key_insight)}</div>
         </div>` : ''}
-      <div class="article-footer">
-        <div class="article-tags">${tags}</div>
-        <div class="article-actions">
+      <div class="card-footer">
+        <div class="tags">${tags}</div>
+        <div class="card-actions">
           <span class="read-time">${article.read_time_minutes || '?'} min</span>
           <button class="save-btn ${isSaved ? 'saved' : ''}" aria-label="${isSaved ? 'Unsave' : 'Save'}">
             ${isSaved ? BOOKMARK_FILLED : BOOKMARK_OUTLINE}
@@ -86,11 +80,6 @@ function articleCard(article, savedUrls) {
     </article>
   `;
 }
-
-function escapeHtml(s) {
-  return String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-const escapeAttr = escapeHtml;
 
 function skeleton(n = 3) {
   return Array.from({ length: n }, () => `
@@ -102,38 +91,50 @@ function skeleton(n = 3) {
   `).join('');
 }
 
-function renderStats() {
-  const el = $('#stats');
+function renderHero() {
+  const kicker = $('#kicker');
+  const title = $('#display-title');
+  const sub = $('#subhead');
+
   if (state.tab === 'saved') {
-    el.innerHTML = `
-      <div class="stat" style="grid-column: 1 / -1;">
-        <div class="stat-label">Saved</div>
-        <div class="stat-value">${state.saved.length}<span class="unit">articles</span></div>
-      </div>
-    `;
+    kicker.textContent = 'Library';
+    title.textContent = 'Saved';
+    sub.textContent = state.saved.length
+      ? `${state.saved.length} article${state.saved.length === 1 ? '' : 's'} set aside.`
+      : 'Nothing set aside yet.';
     return;
   }
+
+  kicker.textContent = formatDate(new Date().toISOString());
+  title.textContent = 'Briefing';
+  sub.textContent = state.briefing
+    ? `Updated ${formatTime(state.briefing.generatedAt)} · ${state.briefing.articleCount} article${state.briefing.articleCount === 1 ? '' : 's'}`
+    : 'Tap refresh for today’s briefing.';
+}
+
+function renderMetrics() {
+  const el = $('#metrics');
+  if (state.tab === 'saved' || !state.briefing) { el.innerHTML = ''; return; }
   const b = state.briefing;
-  if (!b) { el.innerHTML = ''; return; }
   const readTime = b.articles.reduce((s, a) => s + (a.read_time_minutes || 0), 0);
   const cost = b.stats?.estimatedCost;
   const costLabel = cost != null ? `$${cost.toFixed(3)}` : '—';
   el.innerHTML = `
-    <div class="stat">
-      <div class="stat-label">Articles</div>
-      <div class="stat-value">${b.articleCount}</div>
+    <div class="metric">
+      <div class="metric-label">Articles</div>
+      <div class="metric-value">${b.articleCount}</div>
     </div>
-    <div class="stat">
-      <div class="stat-label">Key Stories</div>
-      <div class="stat-value">${b.keyStories}</div>
+    <div class="metric">
+      <div class="metric-label">Must-read</div>
+      <div class="metric-value">${b.keyStories}</div>
     </div>
-    <div class="stat">
-      <div class="stat-label">Read Time</div>
-      <div class="stat-value">${readTime}<span class="unit">min</span></div>
+    <div class="metric">
+      <div class="metric-label">Read time</div>
+      <div class="metric-value">${readTime}<span class="unit">m</span></div>
     </div>
-    <div class="stat">
-      <div class="stat-label">Run Cost</div>
-      <div class="stat-value">${costLabel}</div>
+    <div class="metric">
+      <div class="metric-label">Run cost</div>
+      <div class="metric-value">${costLabel}</div>
     </div>
   `;
 }
@@ -144,7 +145,7 @@ function renderContent() {
 
   if (state.tab === 'saved') {
     if (state.saved.length === 0) {
-      main.innerHTML = `<div class="empty"><h2>Nothing saved</h2><p>Bookmark articles from today's briefing to read them later.</p></div>`;
+      main.innerHTML = `<div class="empty"><h2>Nothing saved yet</h2><p>Bookmark stories from today’s briefing to read them later.</p></div>`;
       return;
     }
     main.innerHTML = state.saved.map((a) => articleCard(a, savedUrls)).join('');
@@ -157,45 +158,48 @@ function renderContent() {
   }
 
   if (!state.briefing || state.briefing.articles.length === 0) {
-    main.innerHTML = `<div class="empty"><h2>No briefing yet</h2><p>Tap refresh to generate today's briefing.</p></div>`;
+    main.innerHTML = `<div class="empty"><h2>No briefing yet</h2><p>Tap the refresh button to generate today’s edition.</p></div>`;
     return;
   }
 
   const articles = state.briefing.articles;
   const top = articles.filter((a) => a.relevance >= 4);
   const rest = articles.filter((a) => a.relevance < 4);
+
   let html = '';
   if (top.length) {
-    html += '<div class="section-label">Top Stories</div>';
-    html += top.map((a) => articleCard(a, savedUrls)).join('');
+    const [hero, ...others] = top;
+    html += '<div class="section-head">Lead Story</div>';
+    html += articleCard(hero, savedUrls, { hero: true });
+    if (others.length) {
+      html += '<div class="section-head">Also Essential</div>';
+      html += others.map((a) => articleCard(a, savedUrls)).join('');
+    }
   }
   if (rest.length) {
-    html += '<div class="section-label">Also Noted</div>';
+    html += '<div class="section-head">Also Noted</div>';
     html += rest.map((a) => articleCard(a, savedUrls)).join('');
   }
   main.innerHTML = html;
 }
 
-function moveIndicator() {
-  const active = $('.tab.active');
-  const indicator = $('.tab-indicator');
-  if (!active || !indicator) return;
-  indicator.style.width = `${active.offsetWidth}px`;
-  indicator.style.transform = `translateX(${active.offsetLeft - 4}px)`;
+function moveSegThumb() {
+  const active = $('.seg.active');
+  const thumb = $('.seg-thumb');
+  if (!active || !thumb) return;
+  thumb.style.width = `${active.offsetWidth}px`;
+  thumb.style.transform = `translateX(${active.offsetLeft - 2}px)`;
 }
 
 function render() {
-  $('#today-date').textContent = formatDate(new Date().toISOString());
-  $('#generated-at').textContent = state.briefing
-    ? `Updated ${formatTime(state.briefing.generatedAt)}`
-    : 'No briefing yet';
-  $$('.tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === state.tab));
-  const btn = $('#refresh-btn');
-  btn.disabled = state.refreshing;
-  btn.classList.toggle('spinning', state.refreshing);
-  renderStats();
+  $$('.seg').forEach((b) => b.classList.toggle('active', b.dataset.tab === state.tab));
+  const refresh = $('#refresh-btn');
+  refresh.disabled = state.refreshing;
+  refresh.classList.toggle('spinning', state.refreshing);
+  renderHero();
+  renderMetrics();
   renderContent();
-  requestAnimationFrame(moveIndicator);
+  requestAnimationFrame(moveSegThumb);
 }
 
 function toast(msg) {
@@ -203,7 +207,7 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add('show');
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => el.classList.remove('show'), 2000);
+  toast._t = setTimeout(() => el.classList.remove('show'), 2200);
 }
 
 async function loadBriefing() {
@@ -212,18 +216,14 @@ async function loadBriefing() {
     const data = await res.json();
     state.briefing = data.briefing;
     state.refreshing = !!data.running;
-  } catch (err) {
-    console.error(err);
-  }
+  } catch (err) { console.error(err); }
 }
 
 async function loadSettings() {
   try {
     const res = await fetch('/api/settings');
     state.settings = await res.json();
-  } catch (err) {
-    console.error(err);
-  }
+  } catch (err) { console.error(err); }
 }
 
 async function saveSettingsApi(settings) {
@@ -236,55 +236,6 @@ async function saveSettingsApi(settings) {
   state.settings = await res.json();
 }
 
-function openSettings() {
-  state.settingsDraft = {
-    interests: [...state.settings.interests],
-    summaryLength: state.settings.summaryLength,
-  };
-  $('#interests-input').value = state.settingsDraft.interests.join('\n');
-  $$('#length-segment .segment-btn').forEach((b) => {
-    b.classList.toggle('active', b.dataset.val === state.settingsDraft.summaryLength);
-  });
-  $('#settings-modal').classList.add('open');
-  $('#settings-modal').setAttribute('aria-hidden', 'false');
-}
-
-function closeSettings() {
-  $('#settings-modal').classList.remove('open');
-  $('#settings-modal').setAttribute('aria-hidden', 'true');
-  state.settingsDraft = null;
-}
-
-async function commitSettings() {
-  const interests = $('#interests-input').value
-    .split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const active = $('#length-segment .segment-btn.active');
-  const summaryLength = active?.dataset.val || 'short';
-
-  if (interests.length === 0) {
-    toast('Add at least one interest');
-    return;
-  }
-
-  const saveBtn = $('#settings-save');
-  saveBtn.disabled = true;
-  saveBtn.textContent = 'Saving…';
-  try {
-    await saveSettingsApi({ interests, summaryLength });
-    closeSettings();
-    toast('Preferences saved');
-    await refresh();
-  } catch (err) {
-    console.error(err);
-    toast('Save failed');
-  } finally {
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Save & regenerate';
-  }
-}
-
 async function refresh() {
   if (state.refreshing) return;
   state.refreshing = true;
@@ -292,7 +243,7 @@ async function refresh() {
   try {
     const res = await fetch('/api/briefing/refresh', { method: 'POST' });
     if (!res.ok) throw new Error('refresh failed');
-    toast('Refreshing briefing…');
+    toast('Curating…');
     pollUntilDone();
   } catch (err) {
     console.error(err);
@@ -308,7 +259,7 @@ function pollUntilDone() {
     render();
     if (!state.refreshing) {
       clearInterval(iv);
-      if (state.briefing) toast(`Briefing ready · ${state.briefing.articleCount} articles`);
+      if (state.briefing) toast(`Ready · ${state.briefing.articleCount} articles`);
     }
   }, 4000);
 }
@@ -329,8 +280,60 @@ function toggleSave(url) {
   render();
 }
 
+/* ---- Settings sheet ---- */
+
+function openSettings() {
+  $('#interests-input').value = (state.settings.interests || []).join('\n');
+  $$('.option').forEach((b) => b.classList.toggle('active', b.dataset.val === state.settings.summaryLength));
+  $('#settings-modal').classList.add('open');
+  $('#settings-modal').setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSettings() {
+  $('#settings-modal').classList.remove('open');
+  $('#settings-modal').setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+async function commitSettings() {
+  const interests = $('#interests-input').value.split('\n').map((s) => s.trim()).filter(Boolean);
+  const active = $('.option.active');
+  const summaryLength = active?.dataset.val || 'short';
+
+  if (interests.length === 0) {
+    toast('Add at least one interest');
+    return;
+  }
+
+  const saveBtn = $('#settings-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    await saveSettingsApi({ interests, summaryLength });
+    closeSettings();
+    toast('Saved');
+    await refresh();
+  } catch (err) {
+    console.error(err);
+    toast('Save failed');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+
+/* ---- Scroll-aware chrome ---- */
+
+function onScroll() {
+  const y = window.scrollY;
+  const chrome = $('.chrome');
+  chrome.classList.toggle('scrolled', y > 8);
+  chrome.classList.toggle('show-title', y > 80);
+}
+
 function bind() {
-  $$('.tab').forEach((btn) => {
+  $$('.seg').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.tab = btn.dataset.tab;
       render();
@@ -338,15 +341,14 @@ function bind() {
   });
   $('#refresh-btn').addEventListener('click', refresh);
   $('#settings-btn').addEventListener('click', openSettings);
-  $('#settings-close').addEventListener('click', closeSettings);
   $('#settings-cancel').addEventListener('click', closeSettings);
   $('#settings-save').addEventListener('click', commitSettings);
   $('#settings-modal').addEventListener('click', (e) => {
     if (e.target.id === 'settings-modal') closeSettings();
   });
-  $$('#length-segment .segment-btn').forEach((btn) => {
+  $$('.option').forEach((btn) => {
     btn.addEventListener('click', () => {
-      $$('#length-segment .segment-btn').forEach((b) => b.classList.remove('active'));
+      $$('.option').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
     });
   });
@@ -356,16 +358,18 @@ function bind() {
   document.addEventListener('click', (e) => {
     const save = e.target.closest('.save-btn');
     if (save) {
-      const url = save.closest('.article')?.dataset.url;
+      const url = save.closest('.card')?.dataset.url;
       if (url) toggleSave(url);
     }
   });
-  window.addEventListener('resize', moveIndicator);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', moveSegThumb);
 }
 
 async function init() {
   bind();
   render();
+  onScroll();
   await Promise.all([loadBriefing(), loadSettings()]);
   render();
   if (state.refreshing) pollUntilDone();
