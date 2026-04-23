@@ -5,6 +5,8 @@ const state = {
   saved: loadSaved(),
   tab: 'today',
   refreshing: false,
+  settings: { interests: [], summaryLength: 'short' },
+  settingsDraft: null,
 };
 
 const $ = (s) => document.querySelector(s);
@@ -209,6 +211,74 @@ async function loadBriefing() {
   }
 }
 
+async function loadSettings() {
+  try {
+    const res = await fetch('/api/settings');
+    state.settings = await res.json();
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+async function saveSettingsApi(settings) {
+  const res = await fetch('/api/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw new Error('Failed to save settings');
+  state.settings = await res.json();
+}
+
+function openSettings() {
+  state.settingsDraft = {
+    interests: [...state.settings.interests],
+    summaryLength: state.settings.summaryLength,
+  };
+  $('#interests-input').value = state.settingsDraft.interests.join('\n');
+  $$('#length-segment .segment-btn').forEach((b) => {
+    b.classList.toggle('active', b.dataset.val === state.settingsDraft.summaryLength);
+  });
+  $('#settings-modal').classList.add('open');
+  $('#settings-modal').setAttribute('aria-hidden', 'false');
+}
+
+function closeSettings() {
+  $('#settings-modal').classList.remove('open');
+  $('#settings-modal').setAttribute('aria-hidden', 'true');
+  state.settingsDraft = null;
+}
+
+async function commitSettings() {
+  const interests = $('#interests-input').value
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const active = $('#length-segment .segment-btn.active');
+  const summaryLength = active?.dataset.val || 'short';
+
+  if (interests.length === 0) {
+    toast('Add at least one interest');
+    return;
+  }
+
+  const saveBtn = $('#settings-save');
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving…';
+  try {
+    await saveSettingsApi({ interests, summaryLength });
+    closeSettings();
+    toast('Preferences saved');
+    await refresh();
+  } catch (err) {
+    console.error(err);
+    toast('Save failed');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save & regenerate';
+  }
+}
+
 async function refresh() {
   if (state.refreshing) return;
   state.refreshing = true;
@@ -261,6 +331,22 @@ function bind() {
     });
   });
   $('#refresh-btn').addEventListener('click', refresh);
+  $('#settings-btn').addEventListener('click', openSettings);
+  $('#settings-close').addEventListener('click', closeSettings);
+  $('#settings-cancel').addEventListener('click', closeSettings);
+  $('#settings-save').addEventListener('click', commitSettings);
+  $('#settings-modal').addEventListener('click', (e) => {
+    if (e.target.id === 'settings-modal') closeSettings();
+  });
+  $$('#length-segment .segment-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      $$('#length-segment .segment-btn').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('#settings-modal').classList.contains('open')) closeSettings();
+  });
   document.addEventListener('click', (e) => {
     const save = e.target.closest('.save-btn');
     if (save) {
@@ -274,7 +360,7 @@ function bind() {
 async function init() {
   bind();
   render();
-  await loadBriefing();
+  await Promise.all([loadBriefing(), loadSettings()]);
   render();
   if (state.refreshing) pollUntilDone();
 }

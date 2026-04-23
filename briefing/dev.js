@@ -5,6 +5,7 @@ import { extname, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import briefingHandler from './api/briefing.js';
 import refreshHandler from './api/briefing/refresh.js';
+import settingsHandler from './api/settings.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = resolve(HERE, 'public');
@@ -54,6 +55,10 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/briefing/refresh') {
       req.body = await readJsonBody(req);
       return refreshHandler(req, res);
+    }
+    if (pathname === '/api/settings') {
+      if (req.method === 'POST') req.body = await readJsonBody(req);
+      return settingsHandler(req, res);
     }
 
     const relPath = pathname === '/' ? '/index.html' : pathname;
