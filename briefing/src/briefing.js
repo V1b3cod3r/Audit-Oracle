@@ -1,6 +1,6 @@
 import { fetchAllFeeds } from './feeds.js';
-import { curateArticles } from './claude.js';
-import { saveBriefing, setRunning, getSettings } from './store.js';
+import { triageArticles, curateArticles, runCost } from './claude.js';
+import { saveBriefing, setRunning, getSettings, getSeenUrls, addSeenUrls } from './store.js';
 
 const STOPWORDS = new Set([
   'and', 'or', 'the', 'a', 'an', 'of', 'to', 'in', 'on', 'for', 'with',
@@ -31,40 +31,59 @@ function prefilter(articles, interests) {
   });
 }
 
+const FULL_CURATE_THRESHOLD = 3;
+const MIN_KEEP_RELEVANCE = 2;
+
 export async function generateBriefing() {
   await setRunning(true);
   const startedAt = new Date().toISOString();
   try {
     const settings = await getSettings();
-    console.log(`[briefing] fetching feeds at ${startedAt} (interests: ${settings.interests.length}, length: ${settings.summaryLength})`);
-    const all = await fetchAllFeeds();
-    const filtered = prefilter(all, settings.interests);
-    const dropped = all.length - filtered.length;
-    console.log(`[briefing] fetched ${all.length}, ${filtered.length} matched prefilter (${dropped} dropped), curating...`);
-    const { articles: curated, usage, estimatedCost, model } = await curateArticles(filtered, settings);
-    curated.sort((a, b) => {
+    console.log(`[briefing] started ${startedAt} (interests: ${settings.interests.length}, length: ${settings.summaryLength})`);
+
+    const fetched = await fetchAllFeeds();
+    const seen = await getSeenUrls();
+    const fresh = fetched.filter((a) => !seen.has(a.url));
+    const filtered = prefilter(fresh, settings.interests);
+    console.log(`[briefing] fetched ${fetched.length} → ${fresh.length} fresh → ${filtered.length} matched prefilter`);
+
+    const { articles: triaged, usage: triageUsage } = await triageArticles(filtered, settings);
+    const toCurate = triaged.filter((a) => a.relevance >= FULL_CURATE_THRESHOLD);
+    const minimal = triaged.filter((a) => a.relevance === MIN_KEEP_RELEVANCE);
+    console.log(`[briefing] triage scored ${triaged.length} → ${toCurate.length} fully curated, ${minimal.length} kept minimal`);
+
+    const { articles: curated, usage: curateUsage } = await curateArticles(toCurate, settings);
+
+    const all = [...curated, ...minimal];
+    all.sort((a, b) => {
       if (b.relevance !== a.relevance) return b.relevance - a.relevance;
       return Date.parse(b.publishedAt) - Date.parse(a.publishedAt);
     });
-    const keyStories = curated.filter((a) => a.relevance >= 4).length;
+
+    const cost = runCost([triageUsage, curateUsage]);
+    const keyStories = all.filter((a) => a.relevance >= 4).length;
     const briefing = {
       generatedAt: new Date().toISOString(),
-      articleCount: curated.length,
+      articleCount: all.length,
       keyStories,
-      articles: curated,
+      articles: all,
       stats: {
-        fetched: all.length,
+        fetched: fetched.length,
+        fresh: fresh.length,
         prefiltered: filtered.length,
-        curated: curated.length,
-        dropped,
-        model,
-        usage,
-        estimatedCost,
+        triaged: triaged.length,
+        fullyCurated: curated.length,
+        keptMinimal: minimal.length,
+        droppedAsSeen: fetched.length - fresh.length,
+        ...cost,
       },
     };
+
     await saveBriefing(briefing);
-    const costStr = estimatedCost != null ? ` (~$${estimatedCost.toFixed(4)})` : '';
-    console.log(`[briefing] done: ${curated.length} articles, ${keyStories} key stories${costStr}`);
+    await addSeenUrls(filtered.map((a) => a.url));
+
+    const costStr = cost.estimatedCost != null ? ` (~$${cost.estimatedCost.toFixed(4)})` : '';
+    console.log(`[briefing] done: ${all.length} articles, ${keyStories} key stories${costStr}`);
     return briefing;
   } finally {
     await setRunning(false);

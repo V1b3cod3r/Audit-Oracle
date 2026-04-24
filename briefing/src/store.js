@@ -6,9 +6,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const LOCAL_DIR = resolve(HERE, '..', 'data');
 const LOCAL_FILE = resolve(LOCAL_DIR, 'briefing.json');
 const LOCAL_SETTINGS = resolve(LOCAL_DIR, 'settings.json');
+const LOCAL_SEEN = resolve(LOCAL_DIR, 'seen-urls.json');
 const BRIEFING_KEY = 'briefing:current';
 const RUNNING_KEY = 'briefing:running';
 const SETTINGS_KEY = 'briefing:settings';
+const SEEN_PREFIX = 'briefing:seen:';
+const SEEN_TTL_DAYS = 7;
 
 const DEFAULT_INTERESTS = [
   'AI policy & regulation',
@@ -142,4 +145,46 @@ export async function saveSettings(input) {
   await mkdir(LOCAL_DIR, { recursive: true });
   await writeFile(LOCAL_SETTINGS, JSON.stringify(settings, null, 2));
   return settings;
+}
+
+export async function getSeenUrls() {
+  const redis = await getRedis();
+  if (redis) {
+    const seen = new Set();
+    let cursor = 0;
+    do {
+      const result = await redis.scan(cursor, { match: `${SEEN_PREFIX}*`, count: 500 });
+      const [next, batch] = Array.isArray(result) ? result : [result.cursor, result.keys];
+      cursor = Number(next);
+      for (const k of batch) seen.add(k.slice(SEEN_PREFIX.length));
+    } while (cursor !== 0);
+    return seen;
+  }
+  try {
+    const raw = await readFile(LOCAL_SEEN, 'utf8');
+    const data = JSON.parse(raw);
+    const cutoff = Date.now() - SEEN_TTL_DAYS * 86400_000;
+    return new Set(Object.entries(data).filter(([, ts]) => ts >= cutoff).map(([url]) => url));
+  } catch (err) {
+    if (err.code === 'ENOENT') return new Set();
+    throw err;
+  }
+}
+
+export async function addSeenUrls(urls) {
+  if (!urls?.length) return;
+  const redis = await getRedis();
+  if (redis) {
+    const ttl = SEEN_TTL_DAYS * 86400;
+    await Promise.all(urls.map((u) => redis.set(`${SEEN_PREFIX}${u}`, 1, { ex: ttl })));
+    return;
+  }
+  let existing = {};
+  try { existing = JSON.parse(await readFile(LOCAL_SEEN, 'utf8')); } catch {}
+  const cutoff = Date.now() - SEEN_TTL_DAYS * 86400_000;
+  for (const [u, ts] of Object.entries(existing)) if (ts < cutoff) delete existing[u];
+  const now = Date.now();
+  for (const u of urls) existing[u] = now;
+  await mkdir(LOCAL_DIR, { recursive: true });
+  await writeFile(LOCAL_SEEN, JSON.stringify(existing));
 }

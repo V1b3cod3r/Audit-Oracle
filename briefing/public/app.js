@@ -49,7 +49,6 @@ const BOOKMARK_FILLED = `<svg width="18" height="18" viewBox="0 0 24 24" fill="c
 
 function articleCard(article, savedUrls, { hero = false } = {}) {
   const isSaved = savedUrls.has(article.url);
-  const tags = (article.tags || []).slice(0, 3).map((t) => `<span class="tag">#${escapeHtml(t)}</span>`).join('');
   return `
     <article class="card ${hero ? 'hero-card' : ''}" data-url="${escapeAttr(article.url)}">
       <div class="card-meta">
@@ -69,9 +68,8 @@ function articleCard(article, savedUrls, { hero = false } = {}) {
           <div class="insight-body">${escapeHtml(article.key_insight)}</div>
         </div>` : ''}
       <div class="card-footer">
-        <div class="tags">${tags}</div>
+        <span class="read-time">${article.read_time_minutes ? `${article.read_time_minutes} min` : ''}</span>
         <div class="card-actions">
-          <span class="read-time">${article.read_time_minutes || '?'} min</span>
           <button class="save-btn ${isSaved ? 'saved' : ''}" aria-label="${isSaved ? 'Unsave' : 'Save'}">
             ${isSaved ? BOOKMARK_FILLED : BOOKMARK_OUTLINE}
           </button>
